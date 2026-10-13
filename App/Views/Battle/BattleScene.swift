@@ -80,7 +80,7 @@ struct BattleSceneView: View {
 
                 FieldText(state: state)
                     .scaleEffect(unit, anchor: .topLeading)
-                    .offset(x: 15 * unit, y: 24 * unit)
+                    .offset(x: 15 * unit, y: 44 * unit)
 
                 if state.turn > 0 {
                     Text("Turn \(state.turn)")

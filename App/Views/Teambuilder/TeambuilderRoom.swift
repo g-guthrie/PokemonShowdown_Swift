@@ -19,6 +19,16 @@ struct TeambuilderRoom: View {
                     }
                 }
         }
+        .onAppear(perform: openDemoSet)
+    }
+
+    @Environment(TeamStore.self) private var teams
+
+    /// `-demoSet` opens the first set of the first team (used for screenshots).
+    private func openDemoSet() {
+        guard ProcessInfo.processInfo.arguments.contains("-demoSet"), path.isEmpty,
+              let team = teams.teams.first, let set = team.pokemon.first else { return }
+        path = [.team(team.id), .set(team: team.id, set: set.id)]
     }
 }
 

@@ -105,11 +105,21 @@ enum DemoContent {
 extension AppModel {
     func startDemos() {
         let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-demoTeams") || arguments.contains("-demoBattle"), teams.teams.isEmpty {
+        if arguments.contains("-demoTeams") || arguments.contains("-demoBattle") || arguments.contains("-demoSet"), teams.teams.isEmpty {
             teams.importText(DemoContent.sampleTeam, format: "gen9ou")
         }
-        if arguments.contains("-demoTeams") {
+        if arguments.contains("-demoTeams") || arguments.contains("-demoSet") {
             open(.teambuilder)
+        }
+        if arguments.contains("-demoFormats") || arguments.contains("-demoLogin") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                if arguments.contains("-demoFormats") {
+                    sheet = .format(selected: "gen9randombattle", mode: .ladder) { _ in }
+                } else {
+                    popup = .login
+                }
+            }
         }
         if arguments.contains("-demoBattle") {
             let battle = BattleController(roomID: DemoContent.battleRoom, app: self)

@@ -124,6 +124,9 @@ jobs:
           shoot 1-home
           shoot 2-battle -demoBattle
           shoot 3-teams -demoTeams
+          shoot 4-formats -demoFormats
+          shoot 5-login -demoLogin
+          shoot 6-set -demoSet
           ls -la screenshots
 
       - uses: actions/upload-artifact@v4
