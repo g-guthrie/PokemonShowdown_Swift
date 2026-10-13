@@ -33,10 +33,11 @@ struct BattleRoom: View {
             }
             Group {
                 if deciding {
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
+                    ScrollView {
                         BattleControlsPanel(battle: battle)
                     }
+                    .defaultScrollAnchor(.bottom)
+                    .scrollBounceBehavior(.basedOnSize)
                     .transition(.opacity)
                 } else {
                     BattleLogView(battle: battle)
@@ -531,9 +532,9 @@ private struct MoveButton: View {
             }
             .foregroundStyle(move.disabled ? Color(hex: 0x707070) : .black)
             .padding(.horizontal, 5)
-            .padding(.top, 7)
-            .padding(.bottom, 4)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.top, 9)
+            .padding(.bottom, 5)
+            .frame(maxWidth: .infinity, minHeight: 54)
         }
         .buttonStyle(MoveButtonStyle(type: type, disabled: move.disabled))
         .disabled(move.disabled)
@@ -607,7 +608,7 @@ private struct PartyButtonLabel: View {
                     .padding(.bottom, 1)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 34)
+        .frame(maxWidth: .infinity, minHeight: 40)
     }
 }
 
