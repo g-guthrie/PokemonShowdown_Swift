@@ -72,6 +72,7 @@ final class AppModel {
         connection.onStateChange = { [weak self] state in self?.connectionChanged(state) }
         connection.connect(to: serverURL)
         dex.load()
+        startDemos()
     }
 
     func reconnect() {

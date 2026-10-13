@@ -20,16 +20,20 @@ struct ShowdownApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tab = ProcessInfo.processInfo.arguments.contains("-demoTeams") ? 1 : 0
 
     var body: some View {
         @Bindable var app = app
-        TabView {
+        TabView(selection: $tab) {
             PlayView()
                 .tabItem { Label("Battle", systemImage: "bolt.fill") }
+                .tag(0)
             TeamsView()
                 .tabItem { Label("Teams", systemImage: "square.stack.3d.up.fill") }
+                .tag(1)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(2)
         }
         .tint(Theme.accentPink)
         .fullScreenCover(item: $app.presentedBattle) { battle in
