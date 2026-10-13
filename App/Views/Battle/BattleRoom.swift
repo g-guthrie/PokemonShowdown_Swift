@@ -1,10 +1,19 @@
 import SwiftUI
 import ShowdownKit
 
-/// A battle tab: scene on top, then the log with the controls docked beneath it.
+/// A battle tab: the scene (with its message box) on top, and below it either the
+/// move/switch controls or, while the turn plays out, the play-by-play log.
 struct BattleRoom: View {
     var battle: BattleController
     @Environment(AppModel.self) private var app
+    @State private var showLog = false
+    @State private var seenChats = 0
+
+    private var chatCount: Int { battle.state.log.filter { $0.kind == .chat }.count }
+
+    private var deciding: Bool {
+        battle.controlsVisible && battle.request != nil && !battle.state.ended
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,18 +21,153 @@ struct BattleRoom: View {
                 TrainerStrip(side: foe, team: nil, isFoe: true)
             }
             BattleSceneView(battle: battle)
+                .overlay(alignment: .bottom) {
+                    BattleMessageBox(battle: battle, unreadChats: max(0, chatCount - seenChats)) {
+                        showLog = true
+                    }
+                    .padding(6)
+                }
                 .overlay(alignment: .bottom) { Rectangle().fill(PS.border).frame(height: 1) }
             if let mine = battle.state.mySide {
                 TrainerStrip(side: mine, team: battle.request?.side.pokemon, isFoe: false)
             }
-            BattleLogView(battle: battle)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    BattleControlsPanel(battle: battle)
+            Group {
+                if deciding {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        BattleControlsPanel(battle: battle)
+                    }
+                    .transition(.opacity)
+                } else {
+                    BattleLogView(battle: battle)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            BattleControlsPanel(battle: battle)
+                        }
+                        .transition(.opacity)
                 }
+            }
+            .frame(maxHeight: .infinity)
+            .animation(.easeOut(duration: 0.2), value: deciding)
         }
         .background(PS.roomOpaque)
+        .sheet(isPresented: $showLog) {
+            BattleLogSheet(battle: battle)
+        }
+        .onChange(of: showLog) { _, open in
+            if open { seenChats = chatCount }
+        }
+        .onChange(of: chatCount) { _, count in
+            if showLog { seenChats = count }
+        }
         .hapticFeedback(.impact(weight: .heavy, intensity: 0.8), trigger: battle.hitCounter)
         .hapticFeedback(.selection, trigger: battle.controlsVisible)
+    }
+}
+
+/// The current battle text, in the translucent style of Showdown's phone overlay controls.
+/// Tapping it opens the full log and chat.
+private struct BattleMessageBox: View {
+    var battle: BattleController
+    var unreadChats: Int
+    var openLog: () -> Void
+
+    /// The last two meaningful lines of the current turn.
+    private var lines: [BattleLogEntry] {
+        let log = battle.state.log
+        let start = (log.lastIndex { $0.kind == .turn }).map { $0 + 1 } ?? 0
+        let kinds: [BattleLogEntry.Kind] = [.action, .effect, .result, .error]
+        let turn = log[start...].filter { kinds.contains($0.kind) }
+        if !turn.isEmpty { return Array(turn.suffix(2)) }
+        return Array(log.filter { $0.kind != .minor && $0.kind != .chat && $0.kind != .turn }.suffix(1))
+    }
+
+    var body: some View {
+        Button(action: openLog) {
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(lines) { entry in
+                        Text(entry.kind == .action ? LogLine.boldMove(entry.text) : AttributedString(entry.text))
+                            .font(PS.font(entry.kind == .action ? 13 : 12))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.easeOut(duration: 0.18), value: lines.map(\.id))
+                ZStack(alignment: .topTrailing) {
+                    VStack(spacing: 1) {
+                        FAIcon(.comment, size: 15)
+                        Text("Chat").font(PS.font(9))
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+                    if unreadChats > 0 {
+                        Text("\(unreadChats)")
+                            .font(PS.font(9, bold: true))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .frame(minWidth: 15, minHeight: 15)
+                            .background(Capsule().fill(Color(hex: 0xCC3311)))
+                            .offset(x: 8, y: -6)
+                    }
+                }
+                .padding(.leading, 6)
+                .overlay(alignment: .leading) { Rectangle().fill(.white.opacity(0.25)).frame(width: 1) }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(minHeight: 40)
+            .background(RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.55)))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(lines.isEmpty ? 0 : 1)
+    }
+}
+
+/// The full log with chat, as a pull-up sheet.
+private struct BattleLogSheet: View {
+    var battle: BattleController
+    @Environment(\.dismiss) private var dismiss
+    @State private var message = ""
+
+    var body: some View {
+        NavigationStack {
+            BattleLogView(battle: battle)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    HStack(spacing: 6) {
+                        TextField("Chat", text: $message)
+                            .textFieldStyle(PSTextFieldStyle())
+                            .submitLabel(.send)
+                            .onSubmit(send)
+                        Button(action: send) {
+                            FAIcon(.paperPlane, size: 14).frame(width: 22, height: 20)
+                        }
+                        .buttonStyle(PSButtonStyle())
+                        .disabled(message.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(8)
+                    .background(PS.roomOpaque)
+                    .overlay(alignment: .top) { Rectangle().fill(PS.border).frame(height: 1) }
+                }
+                .navigationTitle(battle.state.title.isEmpty ? "Battle log" : battle.state.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+    }
+
+    private func send() {
+        battle.sendChat(message)
+        message = ""
     }
 }
 
@@ -80,7 +224,6 @@ private struct TrainerStrip: View {
 private struct BattleControlsPanel: View {
     var battle: BattleController
     @Environment(AppModel.self) private var app
-    @State private var chat = ""
     @State private var timerOn = false
 
     var body: some View {
@@ -100,10 +243,16 @@ private struct BattleControlsPanel: View {
                 case .wait:
                     waiting
                 }
-            } else if battle.choiceSent {
+            } else if battle.choiceSent || battle.request?.kind == .wait {
                 waiting
+            } else if !battle.isPlayer {
+                Text("You are watching this battle.")
+                    .font(PS.font(12))
+                    .foregroundStyle(PS.subtleText)
             } else {
-                chatBox
+                Text(battle.state.started ? "The turn is playing out..." : "Waiting for the battle to start...")
+                    .font(PS.font(12))
+                    .foregroundStyle(PS.subtleText)
             }
         }
         .padding(.horizontal, 8)
@@ -198,16 +347,6 @@ private struct BattleControlsPanel: View {
         let parts = battle.id.split(separator: "-")
         guard parts.count >= 2 else { return nil }
         return app.format(id: String(parts[1]))
-    }
-
-    private var chatBox: some View {
-        TextField("Chat", text: $chat)
-            .textFieldStyle(PSTextFieldStyle())
-            .submitLabel(.send)
-            .onSubmit {
-                battle.sendChat(chat)
-                chat = ""
-            }
     }
 }
 
@@ -556,7 +695,7 @@ struct BattleLogView: View {
     }
 }
 
-private struct LogLine: View {
+struct LogLine: View {
     var entry: BattleLogEntry
 
     var body: some View {
