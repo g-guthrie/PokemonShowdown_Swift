@@ -183,56 +183,69 @@ struct WeatherParticles: View {
         TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
-                switch weather {
-                case "RainDance", "PrimordialSea":
-                    for i in 0..<90 {
-                        let seed = Double(i) * 12.9898
-                        let x = (fract(sin(seed) * 43758.5453) * (size.width + 80)) - 40
-                        let speed = 500 + fract(sin(seed * 2) * 9999) * 300
-                        let y = (fract(sin(seed * 3) * 7777) * size.height + t * speed).truncatingRemainder(dividingBy: size.height + 40) - 20
-                        var path = Path()
-                        path.move(to: CGPoint(x: x, y: y))
-                        path.addLine(to: CGPoint(x: x - 6, y: y + 18))
-                        context.stroke(path, with: .color(.white.opacity(0.28)), lineWidth: 1.2)
-                    }
-                case "Hail", "Snow", "Snowscape":
-                    for i in 0..<70 {
-                        let seed = Double(i) * 78.233
-                        let speed = 30 + fract(sin(seed) * 999) * 40
-                        let y = (fract(sin(seed * 5) * 4242) * size.height + t * speed).truncatingRemainder(dividingBy: size.height + 20) - 10
-                        let x = fract(sin(seed * 7) * 3131) * size.width + sin(t + seed) * 12
-                        let r = 1.5 + fract(sin(seed * 11) * 555) * 2.5
-                        context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: r, height: r)), with: .color(.white.opacity(0.6)))
-                    }
-                case "Sandstorm":
-                    for i in 0..<60 {
-                        let seed = Double(i) * 33.71
-                        let speed = 350 + fract(sin(seed) * 999) * 250
-                        let x = (fract(sin(seed * 2) * 4321) * size.width + t * speed).truncatingRemainder(dividingBy: size.width + 60) - 30
-                        let y = fract(sin(seed * 3) * 8765) * size.height
-                        var path = Path()
-                        path.move(to: CGPoint(x: x, y: y))
-                        path.addLine(to: CGPoint(x: x + 26, y: y + 3))
-                        context.stroke(path, with: .color(Color(hex: 0xE8C27A).opacity(0.35)), lineWidth: 1.5)
-                    }
-                case "SunnyDay", "DesolateLand":
-                    let center = CGPoint(x: size.width * 0.85, y: -20)
-                    for i in 0..<10 {
-                        let angle = Double(i) / 10 * .pi + .pi / 2 + sin(t * 0.3) * 0.08
-                        var path = Path()
-                        path.move(to: center)
-                        path.addLine(to: CGPoint(x: center.x + cos(angle) * 900, y: center.y + sin(angle) * 900))
-                        context.stroke(path, with: .color(Color(hex: 0xFFD27A).opacity(0.07)), lineWidth: 26)
-                    }
-                default:
-                    break
-                }
+                draw(in: &context, size: size, time: t)
             }
         }
         .allowsHitTesting(false)
     }
 
-    private func fract(_ value: Double) -> Double {
-        value - floor(value)
+    /// Stable pseudo-random value in 0..<1 for a particle seed.
+    private func noise(_ seed: Double) -> Double {
+        let value = sin(seed) * 43758.5453
+        return value - floor(value)
+    }
+
+    private func draw(in context: inout GraphicsContext, size: CGSize, time t: Double) {
+        let width = Double(size.width)
+        let height = Double(size.height)
+        switch weather {
+        case "RainDance", "PrimordialSea":
+            for i in 0..<90 {
+                let seed = Double(i) * 12.9898
+                let x: Double = noise(seed) * (width + 80) - 40
+                let speed: Double = 500 + noise(seed * 2) * 300
+                let travel: Double = noise(seed * 3) * height + t * speed
+                let y: Double = travel.truncatingRemainder(dividingBy: height + 40) - 20
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: y))
+                path.addLine(to: CGPoint(x: x - 6, y: y + 18))
+                context.stroke(path, with: .color(.white.opacity(0.28)), lineWidth: 1.2)
+            }
+        case "Hail", "Snow", "Snowscape":
+            for i in 0..<70 {
+                let seed = Double(i) * 78.233
+                let speed: Double = 30 + noise(seed) * 40
+                let travel: Double = noise(seed * 5) * height + t * speed
+                let y: Double = travel.truncatingRemainder(dividingBy: height + 20) - 10
+                let sway: Double = sin(t + seed) * 12
+                let x: Double = noise(seed * 7) * width + sway
+                let r: Double = 1.5 + noise(seed * 11) * 2.5
+                context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: r, height: r)), with: .color(.white.opacity(0.6)))
+            }
+        case "Sandstorm":
+            for i in 0..<60 {
+                let seed = Double(i) * 33.71
+                let speed: Double = 350 + noise(seed) * 250
+                let travel: Double = noise(seed * 2) * width + t * speed
+                let x: Double = travel.truncatingRemainder(dividingBy: width + 60) - 30
+                let y: Double = noise(seed * 3) * height
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: y))
+                path.addLine(to: CGPoint(x: x + 26, y: y + 3))
+                context.stroke(path, with: .color(Color(hex: 0xE8C27A).opacity(0.35)), lineWidth: 1.5)
+            }
+        case "SunnyDay", "DesolateLand":
+            let center = CGPoint(x: width * 0.85, y: -20)
+            for i in 0..<10 {
+                let angle: Double = Double(i) / 10 * Double.pi + Double.pi / 2 + sin(t * 0.3) * 0.08
+                let end = CGPoint(x: Double(center.x) + cos(angle) * 900, y: Double(center.y) + sin(angle) * 900)
+                var path = Path()
+                path.move(to: center)
+                path.addLine(to: end)
+                context.stroke(path, with: .color(Color(hex: 0xFFD27A).opacity(0.07)), lineWidth: 26)
+            }
+        default:
+            break
+        }
     }
 }

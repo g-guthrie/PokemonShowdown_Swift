@@ -47,12 +47,13 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build | tee xcodebuild.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
-          test -d build/Build/Products/Release-iphoneos/Showdown.app
+            build > xcodebuild.log 2>&1 || true
+          grep -E "error:|BUILD (SUCCEEDED|FAILED)" xcodebuild.log || true
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
 
       - name: Show compiler errors
         if: failure()
-        run: grep -E "error:" -A3 xcodebuild.log | head -200
+        run: grep -E "error:" -A3 xcodebuild.log | head -300 || true
 
       - name: Package .ipa
         run: |

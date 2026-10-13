@@ -106,14 +106,11 @@ struct AuroraBackground: View {
                 ZStack {
                     Theme.background
                     ForEach(Array(colors.enumerated()), id: \.offset) { index, color in
-                        let phase = t / (9 + Double(index) * 3) + Double(index) * 2.1
+                        let offset = blobOffset(index: index, time: t, size: size)
                         Circle()
                             .fill(color.opacity(intensity))
                             .frame(width: size.width * 0.95, height: size.width * 0.95)
-                            .offset(
-                                x: cos(phase) * size.width * 0.35,
-                                y: sin(phase * 1.3) * size.height * 0.28 - size.height * 0.18 + Double(index) * size.height * 0.16
-                            )
+                            .offset(x: offset.width, y: offset.height)
                             .blur(radius: 90)
                     }
                     LinearGradient(colors: [.clear, Theme.background.opacity(0.85)], startPoint: .center, endPoint: .bottom)
@@ -123,6 +120,16 @@ struct AuroraBackground: View {
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
+    }
+
+    private func blobOffset(index: Int, time: Double, size: CGSize) -> CGSize {
+        let i = Double(index)
+        let phase: Double = time / (9 + i * 3) + i * 2.1
+        let width = Double(size.width)
+        let height = Double(size.height)
+        let x: Double = cos(phase) * width * 0.35
+        let y: Double = sin(phase * 1.3) * height * 0.28 - height * 0.18 + i * height * 0.16
+        return CGSize(width: x, height: y)
     }
 }
 
