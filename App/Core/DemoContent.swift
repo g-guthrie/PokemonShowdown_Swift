@@ -108,11 +108,14 @@ extension AppModel {
         if arguments.contains("-demoTeams") || arguments.contains("-demoBattle"), teams.teams.isEmpty {
             teams.importText(DemoContent.sampleTeam, format: "gen9ou")
         }
+        if arguments.contains("-demoTeams") {
+            open(.teambuilder)
+        }
         if arguments.contains("-demoBattle") {
             let battle = BattleController(roomID: DemoContent.battleRoom, app: self)
             battle.myUserID = "you"
             battles.append(battle)
-            presentedBattle = battle
+            open(.battle(battle.id))
             battle.receive(DemoContent.battleIntro.components(separatedBy: "\n"), instant: true)
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)

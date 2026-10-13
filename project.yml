@@ -32,8 +32,10 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        UIUserInterfaceStyle: Dark
-        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIUserInterfaceStyle: Light
+        UIStatusBarStyle: UIStatusBarStyleDarkContent
+        UIAppFonts:
+          - FontAwesome.ttf
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

@@ -186,22 +186,22 @@ final class BattleController: Identifiable {
         case let .damage(ref, amount):
             effects[ref, default: SlotEffects()].hit += 1
             hitCounter += 1
-            float(ref, "-\(max(1, Int((amount * 100).rounded())))%", color: Color(hex: 0xFF6B6B))
+            float(ref, "\u{2212}\(max(1, Int((amount * 100).rounded())))%", color: Color(hex: 0xCC0000))
             return 0.75
         case let .heal(ref, amount):
             effects[ref, default: SlotEffects()].heal += 1
-            float(ref, "+\(max(1, Int((amount * 100).rounded())))%", color: Color(hex: 0x5BE38A))
+            float(ref, "+\(max(1, Int((amount * 100).rounded())))%", color: Color(hex: 0x00CC00))
             return 0.55
         case .faint:
             return 0.9
         case .switchIn:
             return 0.75
         case let .status(ref, status):
-            float(ref, status.uppercased(), color: Theme.statusColor(status))
+            float(ref, status.uppercased(), color: PS.statusColor(status))
             return 0.6
         case let .boost(ref, stat, amount):
-            let label = BattleText.statNames[stat] ?? stat
-            float(ref, "\(amount > 0 ? "▲" : "▼") \(label)", color: amount > 0 ? Color(hex: 0x7FD1FF) : Color(hex: 0xFF9F7F))
+            let label = StatSpread.labels[stat] ?? BattleText.statNames[stat] ?? stat
+            float(ref, "\(amount > 0 ? "+" : "")\(amount) \(label)", color: amount > 0 ? Color(hex: 0x00CC00) : Color(hex: 0xCC0000))
             return 0.5
         case .crit:
             hitCounter += 1

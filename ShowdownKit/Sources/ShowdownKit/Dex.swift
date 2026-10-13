@@ -76,12 +76,15 @@ public struct DexData: Sendable {
     /// id -> display name
     public var items: [String: String]
     public var abilities: [String: String]
+    /// item id -> index into Showdown's item icon sheet
+    public var itemSprites: [String: Int]
 
-    public init(species: [String: DexSpecies] = [:], moves: [String: DexMove] = [:], items: [String: String] = [:], abilities: [String: String] = [:]) {
+    public init(species: [String: DexSpecies] = [:], moves: [String: DexMove] = [:], items: [String: String] = [:], abilities: [String: String] = [:], itemSprites: [String: Int] = [:]) {
         self.species = species
         self.moves = moves
         self.items = items
         self.abilities = abilities
+        self.itemSprites = itemSprites
     }
 
     public static func decodeSpecies(_ data: Data) throws -> [String: DexSpecies] {
@@ -101,6 +104,20 @@ public struct DexData: Sendable {
         for match in regex.matches(in: js, range: range) {
             guard let idRange = Range(match.range(at: 1), in: js), let nameRange = Range(match.range(at: 2), in: js) else { continue }
             out[String(js[idRange])] = String(js[nameRange])
+        }
+        return out
+    }
+
+    /// Pulls `id:{name:"...",spritenum:N` pairs out of `items.js`.
+    public static func parseItemSprites(_ js: String) -> [String: Int] {
+        var out: [String: Int] = [:]
+        let pattern = #"([a-z0-9]+):\{name:"[^"]+",spritenum:(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return out }
+        let range = NSRange(js.startIndex..., in: js)
+        for match in regex.matches(in: js, range: range) {
+            guard let idRange = Range(match.range(at: 1), in: js), let numRange = Range(match.range(at: 2), in: js),
+                  let num = Int(js[numRange]) else { continue }
+            out[String(js[idRange])] = num
         }
         return out
     }

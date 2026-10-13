@@ -67,6 +67,7 @@ final class DexStore {
             }
             if let items = try? String(contentsOf: directory.appendingPathComponent("items.js"), encoding: .utf8) {
                 result.items = DexData.parseNameTable(items)
+                result.itemSprites = DexData.parseItemSprites(items)
             }
             if let abilities = try? String(contentsOf: directory.appendingPathComponent("abilities.js"), encoding: .utf8) {
                 result.abilities = DexData.parseNameTable(abilities)

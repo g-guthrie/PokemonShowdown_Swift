@@ -3,6 +3,39 @@ import Observation
 import SwiftUI
 import ShowdownKit
 
+enum Room: Hashable {
+    case home, teambuilder, ladder, battle(String)
+}
+
+enum FormatMode {
+    case ladder, challenge, teambuilder
+}
+
+/// Showdown-style floating popups.
+enum Popup: Identifiable {
+    case format(selected: String, mode: FormatMode, onSelect: (String) -> Void)
+    case team(format: String, selected: String, onSelect: (String) -> Void)
+    case login
+    case options
+    case findUser
+    case watchBattles
+    case acceptChallenge(Challenge)
+    case confirm(message: String, button: String, perform: () -> Void)
+
+    var id: String {
+        switch self {
+        case .format: return "format"
+        case .team: return "team"
+        case .login: return "login"
+        case .options: return "options"
+        case .findUser: return "finduser"
+        case .watchBattles: return "watch"
+        case .acceptChallenge(let challenge): return "accept-" + challenge.id
+        case .confirm(let message, _, _): return "confirm-" + message
+        }
+    }
+}
+
 struct Challenge: Identifiable, Hashable {
     var id: String { user + format }
     var user: String
@@ -33,7 +66,14 @@ final class AppModel {
 
     // Battles
     var battles: [BattleController] = []
-    var presentedBattle: BattleController?
+
+    // Rooms (tabs) and popups
+    var openRooms: [Room] = [.home]
+    var currentRoom: Room = .home
+    var popup: Popup?
+    /// Pickers that slide up as native sheets (format and team selection).
+    var sheet: Popup?
+    var roomList: [(id: String, p1: String, p2: String, minElo: Int?)] = []
 
     var alertMessage: String?
 
@@ -155,6 +195,8 @@ final class AppModel {
                 loginError = line[1].isEmpty ? "That name is taken." : line[1]
             case "pm":
                 handlePM(line)
+            case "queryresponse":
+                handleQueryResponse(type: line[0], json: line[1])
             default:
                 break
             }
@@ -221,13 +263,30 @@ final class AppModel {
         }
     }
 
+    private struct RoomListResponse: Decodable {
+        struct Entry: Decodable {
+            var p1: String?
+            var p2: String?
+            var minElo: Int?
+        }
+        var rooms: [String: Entry]?
+    }
+
+    private func handleQueryResponse(type: String, json: String) {
+        guard type == "roomlist",
+              let response = try? JSONDecoder().decode(RoomListResponse.self, from: Data(json.utf8)) else { return }
+        roomList = (response.rooms ?? [:])
+            .map { (id: $0.key, p1: $0.value.p1 ?? "", p2: $0.value.p2 ?? "", minElo: $0.value.minElo) }
+            .sorted { ($0.minElo ?? 0) > ($1.minElo ?? 0) }
+    }
+
     private func handleBattleFrame(_ frame: ServerFrame) {
         let roomID = frame.roomID
         let isInit = frame.lines.contains { $0.hasPrefix("|init|") }
         if frame.lines.contains(where: { $0.hasPrefix("|deinit") || $0.hasPrefix("|noinit") }) {
             if let index = battles.firstIndex(where: { $0.id == roomID }) {
-                if presentedBattle?.id == roomID { presentedBattle = nil }
                 battles.remove(at: index)
+                closeRoom(.battle(roomID))
             }
             return
         }
@@ -239,9 +298,7 @@ final class AppModel {
             controller = created
             let alreadyKnown = knownGames.contains(roomID)
             knownGames.insert(roomID)
-            if presentedBattle == nil && !alreadyKnown {
-                presentedBattle = created
-            }
+            open(.battle(roomID), select: !alreadyKnown || currentRoom == .battle(roomID))
         }
         if isInit { controller?.reset() }
         controller?.receive(frame.lines, instant: isInit)
@@ -254,8 +311,41 @@ final class AppModel {
     func leave(_ battle: BattleController) {
         sendGlobal("/leave \(battle.id)")
         knownGames.remove(battle.id)
-        if presentedBattle === battle { presentedBattle = nil }
         battles.removeAll { $0 === battle }
+        closeRoom(.battle(battle.id))
+    }
+
+    func open(_ room: Room, select: Bool = true) {
+        if !openRooms.contains(room) {
+            if case .battle = room {
+                openRooms.append(room)
+            } else {
+                openRooms.insert(room, at: min(1, openRooms.count))
+            }
+        }
+        if select { currentRoom = room }
+    }
+
+    func closeRoom(_ room: Room) {
+        guard room != .home else { return }
+        if let index = openRooms.firstIndex(of: room) {
+            openRooms.remove(at: index)
+            if currentRoom == room {
+                currentRoom = openRooms[max(0, index - 1)]
+            }
+        }
+    }
+
+    /// Joins a battle as a spectator.
+    func watch(_ roomID: String) {
+        if battle(roomID) == nil {
+            sendGlobal("/join \(roomID)")
+        }
+        open(.battle(roomID))
+    }
+
+    func requestRoomList(format: String = "") {
+        sendGlobal("/cmd roomlist \(format)")
     }
 
     // MARK: - Account

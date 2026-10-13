@@ -241,6 +241,7 @@ final class DexTests: XCTestCase {
         let table = DexData.parseNameTable(js)
         XCTAssertEqual(table["leftovers"], "Leftovers")
         XCTAssertEqual(table["abilityshield"], "Ability Shield")
+        XCTAssertEqual(DexData.parseItemSprites(js)["abilityshield"], 746)
     }
 }
 
